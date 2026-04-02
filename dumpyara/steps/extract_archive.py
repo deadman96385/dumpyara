@@ -17,11 +17,32 @@ from typing import Callable, Dict
 
 from dumpyara.utils.files import get_recursive_files_list
 
+try:
+	import firmware_parsers
+	_HAS_FIRMWARE_PARSERS = True
+except ImportError:
+	_HAS_FIRMWARE_PARSERS = False
+
 def extract_archive(archive_path: Path, extracted_archive_path: Path, is_nested: bool = False):
 	"""
 	Extract the archive into a folder.
 	"""
 	LOGD(f"Extracting archive: {archive_path.name}")
+
+	# Try firmware_parsers detection first
+	if _HAS_FIRMWARE_PARSERS:
+		try:
+			fmt = firmware_parsers.detect(str(archive_path))
+			if fmt != "unknown":
+				extractor = getattr(firmware_parsers, fmt, None)
+				if extractor is not None:
+					LOGI(f"Detected firmware format: {fmt}")
+					extractor(str(archive_path), str(extracted_archive_path))
+					if is_nested:
+						archive_path.unlink()
+					return
+		except Exception as e:
+			LOGI(f"firmware_parsers failed ({e}), falling back to generic extraction")
 
 	# Extract the archive
 	unpack_archive(archive_path, extracted_archive_path)
@@ -35,6 +56,20 @@ def extract_archive(archive_path: Path, extracted_archive_path: Path, is_nested:
 			continue
 
 		file.rename(extracted_archive_path / file.name)
+
+	# Re-detect firmware formats in extracted files
+	if _HAS_FIRMWARE_PARSERS:
+		for file in list(get_recursive_files_list(extracted_archive_path)):
+			try:
+				fmt = firmware_parsers.detect(str(file))
+				if fmt != "unknown":
+					extractor = getattr(firmware_parsers, fmt, None)
+					if extractor is not None:
+						LOGI(f"Detected nested firmware format: {fmt} in {file.name}")
+						extractor(str(file), str(extracted_archive_path))
+						file.unlink()
+			except Exception as e:
+				LOGD(f"firmware_parsers failed on {file.name}: {e}")
 
 	# Check for nested archives
 	extracted_archive_tempdir_files_list = list(get_recursive_files_list(extracted_archive_path, True))
