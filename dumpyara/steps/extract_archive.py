@@ -23,6 +23,31 @@ try:
 except ImportError:
 	_HAS_FIRMWARE_PARSERS = False
 
+def _strip_vendor_prefix(directory: Path):
+	"""Strip common vendor prefixes from extracted filenames.
+	Detects patterns like Nokia NB0 'LFC-X-YYYY-ZZZZ-name.ext' and renames to 'name.ext'.
+	Only acts when a clear majority of files share the same prefix pattern."""
+	import re
+	files = [f for f in directory.iterdir() if f.is_file()]
+	if len(files) < 3:
+		return
+
+	# Match Nokia-style prefix: LFC-{seg}-{seg}-{seg}- or LFC-{seg}-{seg}-
+	prefix_pattern = re.compile(r'^[A-Z]{2,4}(?:-[A-Za-z0-9]{1,6}){2,4}-')
+	prefixed = {}
+	for f in files:
+		m = prefix_pattern.match(f.name)
+		if m:
+			new_name = f.name[m.end():]
+			if new_name and not (directory / new_name).exists():
+				prefixed[f] = directory / new_name
+
+	# Only rename if most files have the prefix (avoid false positives)
+	if len(prefixed) >= len(files) * 0.6:
+		for old, new in prefixed.items():
+			LOGD(f"Stripping vendor prefix: {old.name} → {new.name}")
+			old.rename(new)
+
 def extract_archive(archive_path: Path, extracted_archive_path: Path, is_nested: bool = False):
 	"""
 	Extract the archive into a folder.
@@ -45,7 +70,17 @@ def extract_archive(archive_path: Path, extracted_archive_path: Path, is_nested:
 			LOGI(f"firmware_parsers failed ({e}), falling back to generic extraction")
 
 	# Extract the archive
-	unpack_archive(archive_path, extracted_archive_path)
+	try:
+		unpack_archive(archive_path, extracted_archive_path)
+	except Exception:
+		# Fallback: try as zip for non-standard extensions (.ozip, .ftf, etc.)
+		from zipfile import ZipFile, is_zipfile
+		if is_zipfile(archive_path):
+			LOGD(f"Falling back to zipfile for {archive_path.name}")
+			with ZipFile(archive_path, 'r') as zf:
+				zf.extractall(extracted_archive_path)
+		else:
+			raise
 	if is_nested:
 		LOGD("Archive is nested, unlinking")
 		archive_path.unlink()
@@ -70,6 +105,9 @@ def extract_archive(archive_path: Path, extracted_archive_path: Path, is_nested:
 						file.unlink()
 			except Exception as e:
 				LOGD(f"firmware_parsers failed on {file.name}: {e}")
+
+	# Strip common vendor prefixes from filenames (e.g., Nokia NB0 "LFC-0-1060-00WW-boot.img" → "boot.img")
+	_strip_vendor_prefix(extracted_archive_path)
 
 	# Check for nested archives
 	extracted_archive_tempdir_files_list = list(get_recursive_files_list(extracted_archive_path, True))
