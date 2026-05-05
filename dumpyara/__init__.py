@@ -1,13 +1,7 @@
 #
-# Copyright (C) 2022 Dumpyara Project
-#
-# SPDX-License-Identifier: GPL-3.0
+# SPDX-FileCopyrightText: Dumpyara Project
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 """Dumpyara library."""
 
-from pathlib import Path
-
-__version__ = "1.0.10"
-
-module_path = Path(__file__).parent
-current_path = Path.cwd()
+__version__ = "1.1.0"

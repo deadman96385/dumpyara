@@ -1,7 +1,6 @@
 #
-# Copyright (C) 2022 Dumpyara Project
-#
-# SPDX-License-Identifier: GPL-3.0
+# SPDX-FileCopyrightText: Dumpyara Project
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 
 from typing import Callable, Dict
@@ -15,36 +14,42 @@ from subprocess import STDOUT, check_output
 from dumpyara.lib.libpayload import extract_android_ota_payload
 
 try:
-	import firmware_parsers
-	_HAS_FIRMWARE_PARSERS = True
+    import firmware_parsers
+
+    _HAS_FIRMWARE_PARSERS = True
 except ImportError:
-	_HAS_FIRMWARE_PARSERS = False
+    _HAS_FIRMWARE_PARSERS = False
+
 
 def extract_payload(image: Path, output_dir: Path):
-	extract_android_ota_payload(image, output_dir)
+    extract_android_ota_payload(image, output_dir)
+
 
 def extract_super(image: Path, output_dir: Path):
-	unsparsed_super = output_dir / "super.unsparsed.img"
+    unsparsed_super = output_dir / "super.unsparsed.img"
 
-	try:
-		if _HAS_FIRMWARE_PARSERS:
-			firmware_parsers.sparse_to_raw(str(image), str(unsparsed_super))
-		else:
-			check_output(["simg2img", image, unsparsed_super], stderr=STDOUT)
-	except Exception:
-		LOGI(f"Failed to unsparse {image.name}")
-	else:
-		move(unsparsed_super, image)
+    try:
+        if _HAS_FIRMWARE_PARSERS:
+            firmware_parsers.sparse_to_raw(str(image), str(unsparsed_super))
+        else:
+            check_output(
+                ["simg2img", image, unsparsed_super], stderr=STDOUT
+            )  # TODO: Rewrite libsparse...
+    except Exception:
+        LOGI(f"Failed to unsparse {image.name}")
+    else:
+        move(unsparsed_super, image)
 
-	if unsparsed_super.is_file():
-		unsparsed_super.unlink()
+    if unsparsed_super.is_file():
+        unsparsed_super.unlink()
 
-	lpunpack(image, output_dir)
+    lpunpack(image, output_dir)
+
 
 MULTIPARTITIONS: Dict[Pattern[str], Callable[[Path, Path], None]] = {
-	compile(key): value
-	for key, value in {
-		"payload.bin": extract_payload,
-		"super(?!.*(_empty)).*\\.img": extract_super,
-	}.items()
+    compile(key): value
+    for key, value in {
+        "payload.bin": extract_payload,
+        "super(?!.*(_empty)).*\\.img": extract_super,
+    }.items()
 }

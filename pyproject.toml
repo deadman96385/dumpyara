@@ -1,9 +1,14 @@
+#
+# SPDX-FileCopyrightText: Dumpyara Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
 [tool.poetry]
 name = "dumpyara"
-version = "1.0.10"
+version = "1.1.0"
 description = "Android firmware extractor"
 authors = ["Sebastiano Barezzi <seba@sebaubuntu.dev>"]
-license = "GPL-3.0"
+license = "GPL-3.0-or-later"
 readme = "README.md"
 repository = "https://github.com/sebaubuntu-python/dumpyara"
 
@@ -14,14 +19,22 @@ dumpyara = 'dumpyara.main:main'
 python = "^3.9"
 Brotli = "^1.0.9"
 protobuf = ">=4.22.1,<7.0.0"
-sebaubuntu-libs = "^1.4.5"
+sebaubuntu-libs = "^2.0.0"
 liblp = "^1.0.2"
 py7zr = "^1.0.0"
 lz4 = "^4.3.3"
 zstandard = ">=0.23,<0.26"
 
-[tool.poetry.dev-dependencies]
-
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+exclude = ["dumpyara/lib/libpayload/update_metadata_pb2.py"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pyright]
+ignore = ["dumpyara/lib/libpayload/__init__.py", "dumpyara/lib/libpayload/update_metadata_pb2.py"]
